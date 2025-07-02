@@ -23,7 +23,7 @@ Select-Object @{Name="Identifiant"; Expression = {$_.SamAccountName}},
               @{Name="Dernière Connexion"; Expression = { if ($_.lastLogonDate) {$_.lastLogonDate } else { "Jamais connecté" }}},
               @{Name="Statut du Compte"; Expression = { if ($_.Enabled) { "Actif" } else { "Désactivé" }}},
               @{Name="Date de Désactivation"; Expression = { if ($_.AccountExpirationDate) { $_.AccountExpirationDate } else { "N/A" }}} |
-Export-Csv -Path "C:\temp\utilisateurs_AD_test2.csv" -NoTypeInformation -Encoding UTF8
+Export-Csv -Path "C:\temp\utilisateurs_AD_test3.csv" -NoTypeInformation -Encoding UTF8
 
 Write-Host "Extraction des informations AD terminée."
 
@@ -112,6 +112,141 @@ c:\> Gather-DLMembers -GroupIdentity DL-Name | Select DisplayName,PrimarySMTPAdd
 This will store the member list in a variable:
 
 c:\> $Members = Gather-DLMembers -GroupIdentity DL-Name
+
+
+
+
+*******
+
+
+
+$csvPath = "C:\Temp\ListeUtilisateurs_Progisap.csv"
+
+# Lecture du fichier CSV
+$users = Import-Csv -Path $csvPath
+
+# Liste pour stocker les résultats
+$results = @()
+
+foreach ($user in $users) {
+    if ($user.Mail) {
+        $escapedMail = $user.Mail.Replace("'", "''")
+
+        try {
+            $adUser = Get-ADUser -Filter "Mail -eq '$escapedMail'" -Properties `
+                EmailAddress, DisplayName, Mail, SamAccountName, Enabled, Description, `
+                Company, Office, WhenCreated, WhenChanged, LastLogonDate
+        } catch {
+            Write-Warning "❌ Erreur lors de la récupération de l'utilisateur avec le mail : $($user.Mail)"
+            continue
+        }
+
+        if ($adUser) {
+            $results += [PSCustomObject]@{
+                EmailAddress   = $adUser.EmailAddress
+                DisplayName    = $adUser.DisplayName
+                Mail           = $adUser.Mail
+                SamAccountName = $adUser.SamAccountName
+                Enabled        = $adUser.Enabled
+                Description    = $adUser.Description
+                Company        = $adUser.Company
+                Office         = $adUser.Office
+                WhenCreated    = $adUser.WhenCreated
+                WhenChanged    = $adUser.WhenChanged
+                LastLogonDate  = $adUser.LastLogonDate
+            }
+        } else {
+            Write-Warning "⚠️ Utilisateur non trouvé avec l'adresse : $($user.Mail)"
+        }
+    } else {
+        Write-Warning "⚠️ Mail vide pour l'utilisateur : $($user.DisplayName)"
+    }
+}
+
+# Exporter les résultats
+$results | Export-Csv -Path "C:\Temp\ResultatsUtilisateurs_AD.csv" -NoTypeInformation -Encoding UTF8
+
+
+****
+
+
+# Importer le module Active Directory
+Import-Module ActiveDirectory
+
+# Chemins des fichiers
+$InputPath = "C:\Temp\SamUtilisateur.csv"
+$OutputPath = "C:\Temp\ListeUtilisateursAD_filtrés.csv"
+
+# Importer la liste des SamAccountName
+$entries = Import-Csv -Path $InputPath
+$UserList = @()
+
+# Parcourir chaque ligne du fichier
+foreach ($entry in $entries) {
+    if ($entry.SamAccountName) {
+        try {
+            $user = Get-ADUser -Identity $entry.SamAccountName -Properties SamAccountName, Name, whenCreated, whenChanged, Enabled, AccountExpirationDate, LastLogonDate
+
+            $UserList += [PSCustomObject]@{
+                "Identifiant"            = $user.SamAccountName
+                "Nom d'utilisateur"      = $user.Name
+                "Date de création"       = $user.whenCreated
+                "Dernière mise à jour"   = $user.whenChanged
+                "Statut"                 = if ($user.Enabled) { "Actif" } else { "Non actif" }
+                "Date de désactivation"  = if ($user.AccountExpirationDate) { $user.AccountExpirationDate } else { "N/A" }
+                "Dernière connexion"     = if ($user.LastLogonDate) { $user.LastLogonDate } else { "Jamais connecté" }
+            }
+        } catch {
+            Write-Warning "❌ Utilisateur introuvable : $($entry.SamAccountName)"
+        }
+    } else {
+        Write-Warning "⚠️ Ligne vide ou sans identifiant dans le CSV."
+    }
+}
+
+# Exporter le résultat
+$UserList | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8
+
+# Afficher les résultats dans la console
+$UserList
+****
+
+
+
+# Chemins des fichiers
+$InputPath = "C:\Temp\SamUtilisateur.csv"
+$OutputPath = "C:\Temp\ListeUtilisateursAD_filtrés.csv"
+
+# Importer la liste des SamAccountName
+$entries = Import-Csv -Path $InputPath
+$UserList = @()
+
+# Parcourir chaque ligne du fichier
+foreach ($entry in $entries) {
+    if ($entry.SamAccountName) {
+        try {
+            $user = Get-ADUser -Identity $entry.SamAccountName -Properties SamAccountName, Name, whenCreated, whenChanged, Enabled, AccountExpirationDate, LastLogonDate
+
+            $UserList += [PSCustomObject]@{
+                "Identifiant"            = $user.SamAccountName
+                "Nom d'utilisateur"      = $user.Name
+                "Date de création"       = $user.whenCreated
+                "Dernière mise à jour"   = $user.whenChanged
+                "Statut"                 = if ($user.Enabled) { "Actif" } else { "Non actif" }
+                "Date de désactivation"  = if ($user.AccountExpirationDate) { $user.AccountExpirationDate } else { "N/A" }
+                "Dernière connexion"     = if ($user.LastLogonDate) { $user.LastLogonDate } else { "Jamais connecté" }
+            }
+        } catch {
+            Write-Warning "❌ Utilisateur introuvable : $($entry.SamAccountName)"
+        }
+    } else {
+        Write-Warning "⚠️ Ligne vide ou sans identifiant dans le CSV."
+    }
+}
+
+# Exporter le résultat
+$UserList | Export-Csv -Path $OutputPath -NoTypeInformation -Encoding UTF8
+
 
 ****
 
